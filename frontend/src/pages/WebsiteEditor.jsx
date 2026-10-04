@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { Code2, LoaderCircle, MessageSquare, Monitor, Rocket, Send, X } from 'lucide-react'
+import { Code2, ExternalLink, LoaderCircle, MessageSquare, Monitor, Rocket, Send, X } from 'lucide-react'
 import { AnimatePresence, motion } from 'motion/react'
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
@@ -16,6 +16,8 @@ const THINKING_STEPS = [
 const WebsiteEditor = () => {
     const [website, setWebsite] = useState(null)
     const [error, setError] = useState("")
+    const [deployError, setDeployError] = useState("")
+    const [deployLoading, setDeployLoading] = useState(false)
     const [code, setCode] = useState("")
     const [messages, setMessages] = useState([])
     const [prompt, setPrompt] = useState("")
@@ -27,14 +29,25 @@ const WebsiteEditor = () => {
     const [showFullPreview, setShowFullPreview] = useState(false)
     const [showChat, setShowChat] = useState(false)
     const handleDeploy = async () => {
-    try {
-         const result = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/website/deploy/${website._id}`,{withCredentials:true})
-         window.open(`${result.data.url}`,"_blank")
-         
-    } catch (error) {
-         console.log(error)
+        const deployTab = window.open('about:blank', '_blank')
+        setDeployError("")
+        setDeployLoading(true)
+        try {
+            const result = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/website/deploy/${website._id}`, { withCredentials: true })
+            const deployUrl = new URL(result.data.url, window.location.origin).toString()
+            setWebsite((currentWebsite) => ({ ...currentWebsite, deployed: true, deployUrl }))
+            if (deployTab) {
+                deployTab.location.replace(deployUrl)
+            } else {
+                setDeployError('Your browser blocked the new tab. Use Open Site to view the published website.')
+            }
+        } catch (error) {
+            deployTab?.close()
+            setDeployError(error.response?.data?.message || 'Unable to deploy this website. Check the server connection and try again.')
+        } finally {
+            setDeployLoading(false)
+        }
     }
-  }
 
     useEffect(() => {
         const intervalId = setInterval(() => {
@@ -150,9 +163,15 @@ const WebsiteEditor = () => {
                 <div className='h-14 px-4 flex justify-between items-center border-b border-white/10 bg-black/80'>
                     <span className='text-xs text-zinc-400'>Live Preview</span>
                     <div className='flex gap-2'>
-                        {website.deployed ? "": <button 
-                        onClick={handleDeploy}
-                        className='flex items-center gap-2 px-4 py-1.5 rounded-lg bg-linear-to-r from-indigo-500 to-purple-500 text-sm font-semibold hover:scale-105 transition'><Rocket size={14} />Deploy</button>}
+                        {website.deployed ? (
+                            <a href={website.deployUrl} target='_blank' rel='noreferrer' className='flex items-center gap-2 px-4 py-1.5 rounded-lg bg-white/10 text-sm font-semibold hover:bg-white/20 transition'>
+                                <ExternalLink size={14} />Open Site
+                            </a>
+                        ) : (
+                            <button disabled={deployLoading} onClick={handleDeploy} className='flex items-center gap-2 px-4 py-1.5 rounded-lg bg-linear-to-r from-indigo-500 to-purple-500 text-sm font-semibold hover:scale-105 transition disabled:opacity-60'>
+                                <Rocket size={14} />{deployLoading ? 'Deploying...' : 'Deploy'}
+                            </button>
+                        )}
                       
                         <button onClick={() => setShowChat(true)} className='p-2 lg:hidden'><MessageSquare size={18} /></button>
                         <button onClick={() => setShowCode(true)} className='p-2'><Code2 size={18} /></button>
@@ -160,6 +179,7 @@ const WebsiteEditor = () => {
                     </div>
 
                 </div>
+                {deployError && <p role='alert' className='px-4 py-2 text-sm text-red-400'>{deployError}</p>}
                 <iframe srcDoc={code} className='flex-1 w-full bg-white' sandbox='allow-scripts allow-same-origin allow-forms'/>
             </div>
 

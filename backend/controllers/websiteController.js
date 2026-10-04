@@ -334,8 +334,12 @@ export const deployWebsite = async (req, res) => {
       website.slug = website.title.toLowerCase().replace(/[^a-z0-9]/g,"").slice(0, 60) + website._id.toString().slice(-5)
     }
 
+    if (!process.env.FRONTEND_URL) {
+      return res.status(500).json({ message: "FRONTEND_URL is not configured on the backend" })
+    }
+
     website.deployed = true
-    website.deployUrl = `${process.env.FRONTEND_URL}/site/${website.slug}`
+    website.deployUrl = new URL(`/site/${website.slug}`, process.env.FRONTEND_URL).toString()
     await website.save()
 
     return res.status(200).json({

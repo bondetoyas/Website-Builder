@@ -10,16 +10,29 @@ function Dashboard() {
   const [websites, setWebsites] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [deployError, setDeployError] = useState("")
+  const [deployingId, setDeployingId] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
   const { userData } = useSelector(state => state.user)
 
   const handleDeploy = async (id) => {
+      const deployTab = window.open('about:blank', '_blank')
+      setDeployError("")
+      setDeployingId(id)
     try {
          const result = await axios.get(`${import.meta.env.VITE_SERVER_URL}/api/website/deploy/${id}`,{withCredentials:true})
-         window.open(`${result.data.url}`,"_blank")
-         setWebsites((prev)=>prev.map((w)=>w._id === id ? {...w, deployed:true, deployUrl:result.data.url}:w))
+        const deployUrl = new URL(result.data.url, window.location.origin).toString()
+        if (deployTab) {
+       deployTab.location.replace(deployUrl)
+        } else {
+       setDeployError('Your browser blocked the new tab. Use Share Link to open the published website.')
+        }
+        setWebsites((prev)=>prev.map((w)=>w._id === id ? {...w, deployed:true, deployUrl}:w))
     } catch (error) {
-         console.log(error)
+        deployTab?.close()
+        setDeployError(error.response?.data?.message || 'Unable to deploy this website. Check the server connection and try again.')
+      } finally {
+        setDeployingId(null)
     }
   }
 
@@ -76,6 +89,7 @@ function Dashboard() {
 
         {loading && <div className="mt-24 text-center text-zinc-400">Loading your websites...</div>}
         {error && !loading && <div className="mt-24 text-center text-red-400">{error}</div>}
+        {deployError && <div role="alert" className="mb-6 text-sm text-red-400">{deployError}</div>}
         {websites?.length === 0 && <div className="mt-24 text-center text-zinc-400">You have no websites.</div>}
         {websites?.length > 0 &&
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
@@ -101,9 +115,9 @@ function Dashboard() {
                     {new Date(w.updatedAt).toLocaleDateString()}
                   </p>
                   {!w.deployed ? (
-                    <button onClick={()=>handleDeploy(w._id)} className="mt-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-linear-to-r from-indigo-500 to-purple-500 hover:scale-105 transition">
+                    <button disabled={deployingId !== null} onClick={()=>handleDeploy(w._id)} className="mt-auto flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-linear-to-r from-indigo-500 to-purple-500 hover:scale-105 transition disabled:opacity-60">
                       <Rocket size={18} />
-                      Deploy
+                      {deployingId === w._id ? 'Deploying...' : 'Deploy'}
                     </button>
                   ) : (
                     <motion.button 
