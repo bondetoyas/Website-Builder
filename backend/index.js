@@ -9,13 +9,32 @@ import cors from 'cors'
 
 const app = express()
 const PORT = process.env.PORT || 8000
+const allowedOrigins = new Set([
+    'http://localhost:5173',
+    'https://doraai-1.onrender.com',
+    'https://website-builder-1-i3ed.onrender.com',
+    process.env.CLIENT_URL,
+    process.env.FRONTEND_URL,
+    ...(process.env.CLIENT_URLS || '').split(',')
+].filter(Boolean).map((origin) => {
+    try {
+        return new URL(origin.trim()).origin
+    } catch {
+        return null
+    }
+}).filter(Boolean))
 
 //middleware
 app.use(express.json())
 app.use(cookieParser())
 app.use(cors({
-    origin: [process.env.CLIENT_URL || 'https://doraai-1.onrender.com', 'http://localhost:5173'],
-    credentials:true
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.has(origin)) {
+            return callback(null, true)
+        }
+        return callback(new Error('Origin is not allowed by CORS'))
+    },
+    credentials: true
 }))
 
 
